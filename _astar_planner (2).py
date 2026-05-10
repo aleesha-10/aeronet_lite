@@ -29,6 +29,37 @@ from typing import Optional
 from astar_planner import astar, plan_delivery_route
 
 
+# Same shape as 3_Path_Planner.CellAdapter — astar_planner expects objects with
+# no_fly and is_commercial_corridor (grid may be dict-backed cells or grid_model Cell).
+@dataclass
+class CellAdapter:
+    row: int
+    col: int
+    no_fly: bool = False
+    is_commercial_corridor: bool = False
+
+
+def _build_adapter_grid(grid_2d):
+    """Wrap a 2D grid of cell-like objects for astar() / plan_delivery_route()."""
+    adapted = []
+    for r, row in enumerate(grid_2d):
+        adapted_row = []
+        for c, cell in enumerate(row):
+            is_comm = bool(getattr(cell, "is_commercial_corridor", False))
+            if not is_comm and getattr(cell, "zone", None) == "Commercial":
+                is_comm = True
+            adapted_row.append(
+                CellAdapter(
+                    row=r,
+                    col=c,
+                    no_fly=bool(getattr(cell, "no_fly", False)),
+                    is_commercial_corridor=is_comm,
+                )
+            )
+        adapted.append(adapted_row)
+    return adapted
+
+
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
@@ -134,11 +165,12 @@ class DeliverySimulator:
             )
 
             # Plan the full route
+            adapted = _build_adapter_grid(self.grid)
             full_path, total_cost, segments, ok = plan_delivery_route(
                 hub=best_drone.home_hub,
                 pickup=delivery.pickup,
                 dropoff=delivery.dropoff,
-                grid=self.grid
+                grid=adapted,
             )
 
             if ok:
@@ -262,7 +294,8 @@ class DeliverySimulator:
         else:
             goal = drone.home_hub
 
-        new_path, new_cost, msg = astar(drone.position, goal, self.grid)
+        adapted = _build_adapter_grid(self.grid)
+        new_path, new_cost, msg = astar(drone.position, goal, adapted)
 
         if msg == "success":
             drone.route = new_path[1:]  # exclude current position

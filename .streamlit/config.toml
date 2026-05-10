@@ -1,0 +1,3 @@
+[client]
+# Hide top-right Deploy / developer toolbar items when running locally.
+toolbarMode = "viewer"

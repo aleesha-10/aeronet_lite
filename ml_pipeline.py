@@ -25,11 +25,16 @@ import pandas as pd
 warnings.filterwarnings('ignore')
 
 # PATH RESOLUTION
-# Works whether this file is run from src/ or from the project root.
+# Artifacts live under data/processed/ (or legacy copies next to the notebooks in pages/).
 _CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT = os.path.dirname(_CURRENT_DIR)  # aeronet_lite/
-
-PROCESSED_DIR = os.path.join(_PROJECT_ROOT, 'data', 'processed')
+_DATA_PROCESSED = os.path.join(_CURRENT_DIR, 'data', 'processed')
+_PAGES_LEGACY = os.path.join(_CURRENT_DIR, 'pages')
+if os.path.isfile(os.path.join(_DATA_PROCESSED, 'demand_model.pkl')):
+    PROCESSED_DIR = _DATA_PROCESSED
+elif os.path.isfile(os.path.join(_PAGES_LEGACY, 'demand_model.pkl')):
+    PROCESSED_DIR = _PAGES_LEGACY
+else:
+    PROCESSED_DIR = _DATA_PROCESSED
 
 # Artifact file names (must match what the notebooks save)
 _DEMAND_MODEL_FILE   = 'demand_model.pkl'
@@ -81,6 +86,24 @@ def _ensure_anomaly_model():
         print("[ML Pipeline] Anomaly classification model loaded.")
 
 
+def ensure_ml_artifacts_loaded() -> None:
+    """
+    Preload pickles into module-level singletons without running inference.
+
+    ``detect_anomaly`` / ``get_demand_forecast`` load lazily on first call; metrics
+    helpers on the ML page sometimes open pickles directly, so ``get_model_status()``
+    can show *_loaded=False even when *_on_disk=True. Warm the cache before status.
+    """
+    try:
+        _ensure_demand_model()
+    except FileNotFoundError:
+        pass
+    try:
+        _ensure_anomaly_model()
+    except FileNotFoundError:
+        pass
+
+
 # FUNCTION 1: DEMAND FORECASTING (REGRESSION)
 
 def get_demand_forecast(
@@ -126,7 +149,8 @@ def get_demand_forecast(
         'windspeed': abs(windspeed)
     }])
 
-    prediction = _demand_model.predict(x)[0]
+    x_in = x.to_numpy(dtype=float)
+    prediction = float(_demand_model.predict(x_in)[0])
 
     if round_output:
         prediction = max(0, round(prediction))
@@ -190,7 +214,8 @@ def get_grid_demand(
                 'temp': temp_var, 'humidity': hum_var, 'windspeed': wind_var
             }])
 
-            pred = _demand_model.predict(x)[0]
+            x_in = x.to_numpy(dtype=float)
+            pred = float(_demand_model.predict(x_in)[0])
             pred += np.random.normal(0, spatial_noise_std * 0.3)
             grid_demand[r][c] = max(0, round(pred))
 
@@ -247,15 +272,19 @@ def detect_anomaly(
         'route_deviation': route_deviation
     }])
 
-    pred_encoded = _anomaly_model.predict(x)[0]
+    x_in = x.to_numpy(dtype=float)
+    pred_encoded = _anomaly_model.predict(x_in)[0]
     label = _anomaly_encoder.inverse_transform([pred_encoded])[0]
 
-    proba = _anomaly_model.predict_proba(x)[0]
-    confidence = round(float(proba[pred_encoded]), 4)
+    proba = _anomaly_model.predict_proba(x_in)[0]
+    classes = list(getattr(_anomaly_model, "classes_", []))
+    pred_idx = classes.index(pred_encoded) if pred_encoded in classes else int(np.argmax(proba))
+    confidence = round(float(proba[pred_idx]), 4)
 
     probabilities = {}
-    for i, class_name in enumerate(_anomaly_encoder.classes_):
-        probabilities[class_name] = round(float(proba[i]), 4)
+    for i, cls_encoded in enumerate(classes):
+        cls_name = _anomaly_encoder.inverse_transform([cls_encoded])[0]
+        probabilities[str(cls_name)] = round(float(proba[i]), 4)
 
     return {
         'label': label,

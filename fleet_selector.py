@@ -24,8 +24,9 @@ Fitness Formula:
 
 import random
 
+# ─────────────────────────────────────────────
 #  DRONE SPECIFICATIONS
-
+# ─────────────────────────────────────────────
 DRONE_TYPES = {
     "light": {
         "cost":    1000,
@@ -39,16 +40,17 @@ DRONE_TYPES = {
     },
 }
 
-
+# ─────────────────────────────────────────────
 #  FITNESS FUNCTION  (shared by both methods)
-def calculate_fitness(light_count, heavy_count, budget):
+# ─────────────────────────────────────────────
+def calculate_fitness(light_count, heavy_count, budget, demand_cap=100):
     """
     Returns a fitness score for a given fleet combination.
 
     Coverage is estimated as:
       - Each light drone covers  12 cells  (its range)
       - Each heavy drone covers  20 cells  (its range)
-      - Max possible coverage   = 100 cells (10x10 grid)
+      - Capped by 10x10 grid (100) then by ``demand_cap`` (ML demand forecast cells/units).
 
     The formula rewards high coverage and punishes overspending.
     score = 0.75 * coverage_pct  -  0.25 * budget_used_pct
@@ -63,16 +65,16 @@ def calculate_fitness(light_count, heavy_count, budget):
     if total_cost > budget:
         return float("-inf")
 
-    # Estimate how many cells the fleet can cover
-    # (capped at 100 because the grid is 10x10)
-    GRID_SIZE = 100
+    GRID_CAP = 100
     coverage = min(
         light_count * DRONE_TYPES["light"]["range"] +
         heavy_count * DRONE_TYPES["heavy"]["range"],
-        GRID_SIZE
+        GRID_CAP,
     )
+    demand_target = demand_cap if demand_cap is not None else GRID_CAP
+    coverage = min(coverage, demand_target)
 
-    coverage_pct    = (coverage    / GRID_SIZE) * 100   # 0 – 100
+    coverage_pct    = (coverage    / GRID_CAP) * 100   # 0 – 100
     budget_used_pct = (total_cost  / budget)    * 100   # 0 – 100
 
     score = (0.75 * coverage_pct) - (0.25 * budget_used_pct)
@@ -82,7 +84,7 @@ def calculate_fitness(light_count, heavy_count, budget):
 # ─────────────────────────────────────────────
 #  OPTION A: BRUTE FORCE
 # ─────────────────────────────────────────────
-def brute_force_select(budget):
+def brute_force_select(budget, demand_cap=100):
     """
     Tries every possible combination of light and heavy drones
     that fits within the budget.
@@ -99,7 +101,7 @@ def brute_force_select(budget):
 
     for light in range(max_light + 1):
         for heavy in range(max_heavy + 1):
-            score = calculate_fitness(light, heavy, budget)
+            score = calculate_fitness(light, heavy, budget, demand_cap)
             if score > best_score:
                 best_score = score
                 best_fleet = (light, heavy)
@@ -112,9 +114,10 @@ def brute_force_select(budget):
 # ─────────────────────────────────────────────
 def genetic_algorithm_select(
     budget,
-    population_size = 20,
-    generations     = 50,
-    mutation_rate   = 0.1,
+    population_size=20,
+    generations=50,
+    mutation_rate=0.1,
+    demand_cap=100,
 ):
     """
     Uses a Genetic Algorithm to evolve a good fleet.
@@ -147,7 +150,7 @@ def genetic_algorithm_select(
 
         # Score every individual
         scored = [
-            (ind, calculate_fitness(ind[0], ind[1], budget))
+            (ind, calculate_fitness(ind[0], ind[1], budget, demand_cap))
             for ind in population
         ]
 
@@ -185,13 +188,13 @@ def genetic_algorithm_select(
     best_individual = max(
         population,
         key=lambda ind: (
-            calculate_fitness(ind[0], ind[1], budget)
-            if calculate_fitness(ind[0], ind[1], budget) != float("-inf")
+            calculate_fitness(ind[0], ind[1], budget, demand_cap)
+            if calculate_fitness(ind[0], ind[1], budget, demand_cap) != float("-inf")
             else -9999
         ),
     )
     best_light, best_heavy = best_individual
-    best_score = calculate_fitness(best_light, best_heavy, budget)
+    best_score = calculate_fitness(best_light, best_heavy, budget, demand_cap)
 
     return (best_light, best_heavy), best_score
 
@@ -199,7 +202,7 @@ def genetic_algorithm_select(
 # ─────────────────────────────────────────────
 #  MAIN RUNNER
 # ─────────────────────────────────────────────
-def select_fleet(budget, method="ga"):
+def select_fleet(budget, method="ga", demand_cap=100):
     """
     Public function that Member 4 calls from main.py.
 
@@ -215,31 +218,33 @@ def select_fleet(budget, method="ga"):
     print("\n" + "=" * 50)
     print("  MODULE 2 – FLEET SELECTOR")
     print("=" * 50)
-    print(f"  Budget  : ₹{budget}")
+    print(f"  Budget  : Rs{budget}")
     print(f"  Method  : {'Genetic Algorithm' if method == 'ga' else 'Brute Force'}")
     print("-" * 50)
 
     if method == "brute":
-        (light, heavy), score = brute_force_select(budget)
+        (light, heavy), score = brute_force_select(budget, demand_cap)
     else:
-        (light, heavy), score = genetic_algorithm_select(budget)
+        (light, heavy), score = genetic_algorithm_select(budget, demand_cap=demand_cap)
 
     total_cost    = light * 1000 + heavy * 1800
     budget_left   = budget - total_cost
     total_drones  = light + heavy
 
     print(f"\n  Best fleet found:")
-    print(f"    Light drones  : {light}  × ₹1000 = ₹{light * 1000}")
-    print(f"    Heavy drones  : {heavy}  × ₹1800 = ₹{heavy * 1800}")
-    print(f"    Total cost    : ₹{total_cost}  (₹{budget_left} remaining)")
+    print(f"    Light drones  : {light}  × Rs1000 = Rs{light * 1000}")
+    print(f"    Heavy drones  : {heavy}  × Rs1800 = Rs{heavy * 1800}")
+    print(f"    Total cost    : Rs{total_cost}  (Rs{budget_left} remaining)")
     print(f"    Total drones  : {total_drones}")
     print(f"    Fitness score : {score}")
 
     # Summarise what the fleet can do
-    GRID_SIZE   = 100
-    coverage    = min(light * 12 + heavy * 20, GRID_SIZE)
+    GRID_CAP = 100
+    raw_cov = min(light * 12 + heavy * 20, GRID_CAP)
+    dt = demand_cap if demand_cap is not None else GRID_CAP
+    coverage = min(raw_cov, dt)
     print(f"\n  Fleet capability:")
-    print(f"    Max grid coverage : {coverage} / {GRID_SIZE} cells")
+    print(f"    Max effective coverage : {coverage} / {GRID_CAP} cells (demand_cap={dt})")
     print(f"    Heavy payload     : up to {heavy * 5} kg per batch")
     print(f"    Light payload     : up to {light * 2} kg per batch")
     print("=" * 50 + "\n")
@@ -253,7 +258,7 @@ def select_fleet(budget, method="ga"):
 # ─────────────────────────────────────────────
 if __name__ == "__main__":
 
-    BUDGET = 10_000   # ₹10,000
+    BUDGET = 10_000   # Rs10,000
 
     # --- Test Brute Force ---
     fleet_bf, score_bf = select_fleet(BUDGET, method="brute")
@@ -267,10 +272,10 @@ if __name__ == "__main__":
     print(f"  Genetic Alg  →  {fleet_ga}  score={score_ga}")
 
     # --- Show fitness for a few manual combinations ---
-    print("\nMANUAL FITNESS CHECK  (budget = ₹10,000)")
+    print("\nMANUAL FITNESS CHECK  (budget = Rs10,000)")
     combos = [(5, 0), (0, 5), (3, 2), (4, 2), (2, 3), (6, 1)]
     for l, h in combos:
         s = calculate_fitness(l, h, BUDGET)
         cost = l * 1000 + h * 1800
         tag  = "✔" if cost <= BUDGET else "✘ over budget"
-        print(f"  Light={l}, Heavy={h} → cost=₹{cost}  score={s}  {tag}")
+        print(f"  Light={l}, Heavy={h} → cost=Rs{cost}  score={s}  {tag}")
