@@ -26,9 +26,9 @@ A* Design (as per project spec):
 import heapq
 
 
-# ---------------------------------------------------------------------------
+
 # Helper functions
-# ---------------------------------------------------------------------------
+
 
 def manhattan(a, b):
     """Manhattan distance between two (row, col) coordinates."""
