@@ -39,9 +39,8 @@ DRONE_TYPES = {
     },
 }
 
-# ─────────────────────────────────────────────
+
 #  FITNESS FUNCTION  (shared by both methods)
-# ─────────────────────────────────────────────
 def calculate_fitness(light_count, heavy_count, budget):
     """
     Returns a fitness score for a given fleet combination.
