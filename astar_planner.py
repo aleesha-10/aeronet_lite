@@ -9,7 +9,6 @@ Original file is located at
 
 """
 AeroNet Lite - Module 3a: A* Path Planner
-==========================================
 Implements A* search on the 10x10 city grid.
 
 Route per delivery: Hub -> Pickup -> Drop-off -> Hub
@@ -61,9 +60,9 @@ def get_move_cost(row, col, grid):
     return 1.0
 
 
-# ---------------------------------------------------------------------------
+
 # Core A* algorithm
-# ---------------------------------------------------------------------------
+
 
 def astar(start, goal, grid):
     """
@@ -141,10 +140,8 @@ def astar(start, goal, grid):
     # Open set exhausted — no path exists
     return [], 0.0, f"FAILED: No safe path from {start} to {goal}"
 
-
-# ---------------------------------------------------------------------------
 # Delivery route planner (Hub -> Pickup -> Drop-off -> Hub)
-# ---------------------------------------------------------------------------
+
 
 def plan_delivery_route(hub, pickup, dropoff, grid):
     """
@@ -191,9 +188,7 @@ def plan_delivery_route(hub, pickup, dropoff, grid):
     return full_path, total_cost, segments, all_ok
 
 
-# ---------------------------------------------------------------------------
 # Quick standalone test
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     # Import grid model (Member 1's file); fall back to a minimal inline grid for testing
