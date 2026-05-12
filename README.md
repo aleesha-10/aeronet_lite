@@ -1,10 +1,22 @@
-# AeroNet Lite — Autonomous Drone Delivery Simulation
-
+# AeroNet Lite
 
 A simulation of an autonomous drone delivery system built on a 10x10 city grid. The system validates city layouts, selects drone fleets, plans delivery routes, handles disruptions in real time, forecasts demand, and detects flight anomalies.
 
 ![Demo](./aeronet_lite.gif)
 
+---
+
+## What This Project Does
+
+AeroNet Lite simulates how a fleet of drones would operate in a small city. The city is represented as a 10x10 grid where each cell has a zone type, population density, and delivery demand. Over 20 simulation steps, drones pick up and drop off deliveries, avoid restricted zones, and adapt if those zones change mid-flight.
+
+The system is split into five modules that work together:
+
+- **Grid and layout validation** — defines the city and checks that it follows the rules before the simulation starts
+- **Fleet selection** — picks the right mix of drones within a budget
+- **Route planning** — finds the best path for each drone and reroutes them if a zone is blocked mid-flight
+- **ML pipeline** — predicts how much demand there will be each hour and flags drones behaving abnormally
+- **Visualization and integration** — displays the grid, routes, and heatmaps, and ties all the modules together
 
 ---
 
@@ -13,22 +25,22 @@ A simulation of an autonomous drone delivery system built on a 10x10 city grid. 
 ```
 aeronet_lite/
   data/
-    raw/              # Original datasets (not tracked by git)
-    processed/        # Trained model .pkl files
+    raw/              # Original datasets (not tracked by git, download separately)
+    processed/        # Trained model files saved here after running notebooks
   src/
-    grid_model.py         # Shared 10x10 grid data model
-    layout_validator.py   # CSP-based layout constraint checker
-    fleet_selector.py     # Heuristic / GA fleet selection
-    astar_planner.py      # A* delivery path planner
-    delivery_simulator.py # 20-step simulation engine
+    grid_model.py         # 10x10 grid data model
+    layout_validator.py   # Checks the city layout against constraints
+    fleet_selector.py     # Selects which drones to use
+    astar_planner.py      # Plans delivery routes using A*
+    delivery_simulator.py # Runs the 20-step simulation
     ml_pipeline.py        # Demand forecasting and anomaly detection
-    visualization.py      # Grid, route, and heatmap plots
-    main.py               # Entry point
+    visualization.py      # Grid, route, and heatmap rendering
+    main.py               # Run this to start the simulation
   notebooks/
-    demand_forecasting.ipynb    # Regression model training
-    anomaly_classifier.ipynb    # Classification model training
+    demand_forecasting.ipynb    # Train the demand forecast model
+    anomaly_classifier.ipynb    # Train the anomaly detection model
   report/
-    figures/          # Saved plots
+    figures/
     final_report.docx
   requirements.txt
   README.md
@@ -36,92 +48,96 @@ aeronet_lite/
 
 ---
 
-## Modules
-
-### Module 1 — Grid Model and Layout Validator
-Defines the shared 10x10 grid. Each cell holds zone type, population density, hub and charging flags, no-fly status, and demand value. The layout validator checks four CSP constraints and reports any violations with suggested fixes.
-
-### Module 2 — Fleet Selector
-Selects a combination of light and heavy drones under a fixed budget. Uses a heuristic scoring function or a Genetic Algorithm. Output is a list of assigned drones used by the path planner and simulator.
-
-### Module 3 — A* Path Planner and Disruption Handler
-Plans routes for each delivery as hub to pickup to drop-off to hub using A* search. Avoids no-fly cells. If a no-fly cell is activated mid-simulation, affected drones are rerouted automatically from their current position.
-
-### Module 4 — ML Pipeline
-Provides two callable functions used during the simulation:
-
-- `get_demand_forecast()` — predicts hourly delivery demand using a trained Random Forest regressor
-- `detect_anomaly()` — classifies drone telemetry as Normal, Battery Anomaly, Route Anomaly, or Sensor Spike using a trained Random Forest classifier
-
-Additional helpers include `get_grid_demand()` for full grid demand arrays, `detect_anomalies_batch()` for checking all active drones at once, and `assign_demand_to_grid()` for writing forecasts directly into the shared grid model.
-
-### Module 5 — Visualization and Integration
-Renders the zone map, route overlays, demand heatmap, and anomaly event log. Integrates all modules and drives the 20-step simulation through main.py.
-
----
-
 ## Setup
 
-Clone the repository and set up a virtual environment.
+Make sure you have Python installed, then run the following:
 
 ```bash
 git clone <repo-url>
 cd aeronet_lite
 python -m venv venv
+
+# Activate the virtual environment
 venv\Scripts\activate       # Windows
 source venv/bin/activate    # Mac / Linux
+
 pip install -r requirements.txt
 ```
 
 ---
 
-## Running the ML Pipeline
+## Before Running the Simulation
 
-The ML pipeline requires trained model files before it can be used. Run the notebooks first in this order.
+The ML pipeline needs trained model files to work. You have to run the two notebooks first, in order.
 
-**Step 1 — Train the demand forecasting model**
+### Step 1 — Train the demand forecast model
 
-Open and run all cells in `notebooks/demand_forecasting.ipynb`. This saves the following files to `data/processed/`:
+Open `notebooks/demand_forecasting.ipynb` and run all cells.
+
+This notebook requires the Kaggle Bike Sharing Demand dataset. Download `train.csv` from Kaggle and place it at:
+
+```
+data/raw/bike-sharing/train.csv
+```
+
+When the notebook finishes, it saves these files to `data/processed/`:
+
 - `demand_model.pkl`
 - `demand_scaler.pkl`
 
-The notebook requires `data/raw/bike-sharing/train.csv` from the Kaggle Bike Sharing Demand dataset.
+### Step 2 — Train the anomaly detection model
 
-**Step 2 — Train the anomaly classifier**
+Open `notebooks/anomaly_classifier.ipynb` and run all cells.
 
-Open and run all cells in `notebooks/anomaly_classifier.ipynb`. This saves:
+This notebook generates its own synthetic data, so you do not need to download anything. When it finishes, it saves:
+
 - `anomaly_model.pkl`
 - `anomaly_scaler.pkl`
 - `anomaly_label_encoder.pkl`
 
-This notebook generates its own synthetic drone telemetry data. No external dataset is required.
-
-**Step 3 — Verify the pipeline**
+### Step 3 — Check that the pipeline is working
 
 ```bash
 cd src
 python ml_pipeline.py
 ```
 
-All status checks should show Yes and all self-tests should pass.
+All status checks should say Yes and all self-tests should pass. If anything fails, make sure the `.pkl` files exist in `data/processed/`.
 
 ---
 
-## Importing the ML Pipeline in Other Modules
+## Running the Simulation
+
+Once the models are trained:
+
+```bash
+cd src
+python main.py
+```
+
+This runs the full 20-step simulation. You will see the drone routes, demand heatmap, and anomaly log rendered on the grid.
+
+---
+
+## Using the ML Pipeline in Your Own Code
+
+If you want to call the ML functions from another module:
 
 ```python
 from ml_pipeline import get_demand_forecast, detect_anomaly, get_grid_demand, assign_demand_to_grid
 
-# Predict demand for a single hour
+# Predict delivery demand for a given hour
 demand = get_demand_forecast(hour=8, season=2, workingday=1, weather=1)
 
-# Classify a drone telemetry reading
+# Check whether a drone's telemetry looks normal
 result = detect_anomaly(battery_drop=35.0, route_deviation=1.0)
 print(result['label'], result['is_anomaly'])
 
-# Populate demand across the full grid
+# Fill the full grid with demand values for a given hour
 grid = assign_demand_to_grid(grid, hour=14, season=2)
 ```
+
+The four anomaly labels the classifier can return are: Normal, Battery Anomaly, Route Anomaly, and Sensor Spike.
 
 ---
 
@@ -129,14 +145,14 @@ grid = assign_demand_to_grid(grid, hour=14, season=2)
 
 | Purpose | Source |
 |---|---|
-| Demand forecasting | Kaggle — Bike Sharing Demand (train.csv) |
-| Anomaly detection | Synthetic data generated in notebook |
+| Demand forecasting | Kaggle — Bike Sharing Demand (`train.csv`) |
+| Anomaly detection | Synthetic data generated inside the notebook |
 
 Raw data files are not tracked by git. Each team member downloads their own copy and places it in `data/raw/`.
 
 ---
 
-## Team
+## Module Ownership
 
 | Member | Module |
 |---|---|
@@ -148,4 +164,6 @@ Raw data files are not tracked by git. Each team member downloads their own copy
 
 ---
 
-*This README will be updated as modules are completed and integrated.*
+By: 
+Aleesha,Wajeeha,Tayyaba,Hadia,Areeba <3
+
