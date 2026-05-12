@@ -3,7 +3,8 @@
 
 A simulation of an autonomous drone delivery system built on a 10x10 city grid. The system validates city layouts, selects drone fleets, plans delivery routes, handles disruptions in real time, forecasts demand, and detects flight anomalies.
 
-Built as a semester project for BS Data Science — AI, Spring 2026.
+![Demo](./aeronet_lite.gif)
+
 
 ---
 
@@ -148,5 +149,3 @@ Raw data files are not tracked by git. Each team member downloads their own copy
 ---
 
 *This README will be updated as modules are completed and integrated.*
-
-<video aeronet_lite="gif.mp4" autoplay loop muted width="600"></video>
